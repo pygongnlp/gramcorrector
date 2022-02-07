@@ -12,8 +12,12 @@ predict if one sentence is grammatical, also output which token is wrong in an e
 **Spell Error Correction (Chinese)**  
 use to correct spell error in chinese
 
-**Grammatical Error Correction**
+**Grammatical Error Correction**  
 use to correct all type of errors
+
+
+### Connect  
+Peiyuan Gong(BIT)  pygongnlp@gmail.com
 
 
 
