@@ -58,7 +58,7 @@ def valid(model, data_loader, tokenizer):
             loss = output.loss
             epoch_loss += loss.item()
 
-            predictions =output.logits.argmax(-1)
+            predictions = output.logits.argmax(-1)
             for s, t, t_l, predict in zip(src_oral, trg_oral, trg, predictions):
                 predict = tokenizer.convert_ids_to_tokens([p for p_id, p in enumerate(predict) if t_l[p_id] != -100])
                 assert len(s) == len(t) == len(predict), f"{s}  {t}  {predict}  {len(s)}/{len(t)}/{len(predict)}"
