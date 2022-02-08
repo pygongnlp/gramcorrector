@@ -72,9 +72,9 @@ def valid(model, data_loader, tokenizer):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Training a spell error correction model")
     parser.add_argument("--model_name_or_path", default="model/chinese_bert", type=str)
-    parser.add_argument("--train_file", default="data/sighan/15/15train.txt", type=str)
-    parser.add_argument("--valid_file", default="data/sighan/15/15test.txt", type=str)
-    parser.add_argument("--output_dir", default="spell_gec/checkpoints", type=str)
+    parser.add_argument("--train_file", default="data/sighan/train.json", type=str)
+    parser.add_argument("--valid_file", default="data/sighan/dev.json", type=str)
+    parser.add_argument("--output_dir", default="spell_gec/checkpoints/bert", type=str)
     parser.add_argument("--train_batch_size", default=8, type=int)
     parser.add_argument("--valid_batch_size", default=8, type=int)
     parser.add_argument("--max_length", default=512, type=int)
@@ -99,10 +99,8 @@ if __name__ == "__main__":
     model = model.to(device)
     compute_model_size(model)
 
-    src_lst, trg_lst = load_data(args.train_file, mode="train")
-    train_dataset = SpellGECDataset(src_lst, trg_lst)
-    src_lst, trg_lst = load_data(args.valid_file, mode="valid")
-    valid_dataset = SpellGECDataset(src_lst, trg_lst)
+    train_dataset = SpellGECDataset(file_path=args.train_file, mode="train")
+    valid_dataset = SpellGECDataset(file_path=args.valid_file, mode="valid")
 
     collactor = DataCollactorForSpellGEC(tokenizer=tokenizer, max_length=args.max_length)
     train_dataloader = DataLoader(train_dataset, shuffle=True, collate_fn=collactor,
@@ -126,16 +124,16 @@ if __name__ == "__main__":
     patience = 0
     valid_loss, valid_metrics, _ = valid(model, valid_dataloader, tokenizer)
     store_metrics = {
-        "train_metrics": {},
         "valid_metrics": valid_metrics
     }
     print(f"Before training:  valid_loss={valid_loss:.4f}, {', '.join([f'{key}:{value:.4f}' for key, value in valid_metrics.items()])}")
 
     for epoch in range(args.epochs):
-        print(f"Start Training {epoch+1}th epochs")
+        print(f"Start train {epoch+1}th epochs")
         train_loss, train_metrics = train(model, train_dataloader, optimizer, tokenizer)
         print(f"Epoch {epoch+1}th:  train_loss {train_loss:.4f}, {', '.join([f'{key}:{value:.4f}' for key, value in train_metrics.items()])}")
 
+        print(f"Start valid {epoch+1}th epochs")
         valid_loss, valid_metrics, results = valid(model, valid_dataloader, tokenizer)
         print(f"Epoch {epoch+1}th:  valid_loss={valid_loss:.4f}, {', '.join([f'{key}:{value:.4f}' for key, value in valid_metrics.items()])}")
 
@@ -144,7 +142,6 @@ if __name__ == "__main__":
             store_metrics["valid_metrics"] = valid_metrics
             patience = 0
 
-            write_to_file(os.path.join(args.output_dir, "result.txt"), results)
             torch.save({
                 "config": args,
                 "epoch": epoch + 1,
@@ -153,8 +150,10 @@ if __name__ == "__main__":
                 "train_metrics": train_metrics,
                 "train_loss": train_loss,
                 "valid_loss": valid_loss,
-            }, os.path.join(args.output_dir, "bert_spell_gec.tar"))
+            }, os.path.join(args.output_dir, "model.tar"))
             print(f"save model to {args.output_dir}")
+
+            write_to_file(os.path.join(args.output_dir, "result.json"), results)
         else:
             patience += 1
             print(f"patience up to {patience}")
@@ -164,6 +163,10 @@ if __name__ == "__main__":
             print(f"Best train metrics={', '.join([f'{key}:{value:.4f}' for key, value in store_metrics['train_metrics'].items()])}"
                   f"valid metrics={', '.join([f'{key}:{value:.4f}' for key, value in store_metrics['valid_metrics'].items()])}")
             break
+    if patience < args.patience:
+        print("Training Over!")
+        print(f"Best train metrics={', '.join([f'{key}:{value:.4f}' for key, value in store_metrics['train_metrics'].items()])}"
+            f"valid metrics={', '.join([f'{key}:{value:.4f}' for key, value in store_metrics['valid_metrics'].items()])}")
 
 
 

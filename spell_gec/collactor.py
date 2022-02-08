@@ -6,7 +6,6 @@ class DataCollactorForSpellGEC(object):
         self.max_length = max_length
 
     def __call__(self, batch):
-        #tokenize src & trg to compute metrics
         src_oral = [self.tokenizer.tokenize(pair[0]) for pair in batch]
         trg_oral = [self.tokenizer.tokenize(pair[1]) for pair in batch]
         for s, t in zip(src_oral, trg_oral):

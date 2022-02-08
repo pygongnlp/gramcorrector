@@ -1,10 +1,9 @@
 from torch.utils.data import Dataset
-
+from utils import load_data
 
 class SpellGECDataset(Dataset):
-    def __init__(self, src_lst, trg_lst):
-        self.src_lst = src_lst
-        self.trg_lst = trg_lst
+    def __init__(self, file_path, mode):
+        self.src_lst, self.trg_lst = load_data(file_path, mode)
 
     def __len__(self):
         return len(self.src_lst)
