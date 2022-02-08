@@ -75,14 +75,14 @@ if __name__ == "__main__":
     parser.add_argument("--model_name_or_path", default="model/chinese_bert", type=str)
     parser.add_argument("--train_file", default="data/sighan/train.json", type=str)
     parser.add_argument("--valid_file", default="data/sighan/dev.json", type=str)
-    parser.add_argument("--output_dir", default="ged_classification/checkpoints", type=str)
+    parser.add_argument("--output_dir", default="ged_classification/checkpoints/bert", type=str)
     parser.add_argument("--train_batch_size", default=8, type=int)
     parser.add_argument("--valid_batch_size", default=8, type=int)
     parser.add_argument("--max_length", default=512, type=int)
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--epochs", default=100, type=int)
     parser.add_argument("--patience", default=3, type=int)
-    parser.add_argument("--lr", default=3e-4, type=float)
+    parser.add_argument("--lr", default=3e-5, type=float)
     parser.add_argument("--weight_decay", default=0.0, type=float)
     args = parser.parse_args()
     print(args)
@@ -125,9 +125,11 @@ if __name__ == "__main__":
 
     patience = 0
     valid_loss, valid_acc, _ = valid(model, valid_dataloader, id2label)
+    store_acc = {
+        "valid_acc": valid_acc
+    }
     print(f"Before training:  valid_loss {valid_loss:.4f};  valid_acc {valid_acc:.4f}")
 
-    best_acc = valid_acc
     for epoch in range(args.epochs):
         print(f"Start train {epoch+1}th epoch")
         train_loss, train_acc = train(model, train_dataloader, optimizer, id2label)
@@ -137,8 +139,9 @@ if __name__ == "__main__":
         valid_loss, valid_acc, results = valid(model, valid_dataloader, id2label)
         print(f"Epoch {epoch+1}th:  valid_loss {valid_loss:.4f};  valid_acc {valid_acc:.4f}")
 
-        if valid_acc > best_acc:
-            best_acc = valid_acc
+        if valid_acc > store_acc["valid_acc"]:
+            store_acc["train_acc"] = train_acc
+            store_acc["valid_acc"] = valid_acc
             patience = 0
             torch.save({
                 "config": args,
@@ -149,7 +152,7 @@ if __name__ == "__main__":
                 "train_loss": train_loss,
                 "valid_loss": valid_loss,
                 "label2id": label2id
-            }, os.path.join(args.output_dir, "bert_ged.tar"))
+            }, os.path.join(args.output_dir, "model.tar"))
             print(f"Save model to {args.output_dir}")
             write_to_file(results, os.path.join(args.output_dir, "result.json"))
         else:
@@ -158,12 +161,12 @@ if __name__ == "__main__":
 
         if patience == args.patience:
             print("Training Over!")
-            print(f"Best valid_acc {best_acc:.4f}")
+            print(f"Best train_acc {store_acc['train_acc']:.4f}, valid_acc {store_acc['valid_acc']}")
             break
 
     if patience < args.patience:
         print("Training Over!")
-        print(f"Best valid_acc {best_acc:.4f}")
+        print(f"Best train_acc {store_acc['train_acc']:.4f}, valid_acc {store_acc['valid_acc']:.4f}")
 
 
 
