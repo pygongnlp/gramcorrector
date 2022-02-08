@@ -1,6 +1,16 @@
 # gramcorrector
 A simple tutoral for error correction task, based on Pytorch
 
+### Corpus
+#### SIGHAN
+using SIGHAN13, 14, 15 & Augumented 28W sentences
+preprocess following <https://github.com/gitabtion/BertBasedCorrectionModels/>     
+
+|  Train  |  Valid  |  Test  |  
+|  ----  | ----  |  ----  |
+| 251841/2921  | 27982/293 | 1100/558  |  
+
+
 **Grammatical Error Detection (sentence-level)**
 
 a binary sequence-based classification task, use to predict if one sentence is grammatical.
