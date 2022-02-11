@@ -24,19 +24,27 @@ def load_data(file_path, mode="train"):
     print(f"{len(src_lst)} examples in {mode} file, {same_cnt} pairs are the same")
     return src_lst, trg_lst
 
+def epoch_time(start_time, end_time):
+    elapsed_time = end_time - start_time
+    elapsed_mins = int(elapsed_time / 60)
+    elapsed_secs = int(elapsed_time - (elapsed_mins * 60))
+    return elapsed_mins, elapsed_secs
+
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.enabled = True
+    torch.backends.cudnn.benchmark = True
 
 def write_to_file(file_path, results):
     result_j = []
     for result in results:
         result_j.append({
-            "error sentence": result[0],
-            "correct sentence": result[1],
-            "predict sentence": result[2]
+            "err_sent": "".join(result[0]),
+            "cor_sent": "".join(result[1]),
+            "pre_sent": "".join(result[2])
         })
     json.dump(result_j, open(file_path, "w", encoding="utf8"), indent=2, ensure_ascii=False)
 
