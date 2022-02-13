@@ -1,9 +1,11 @@
-CUDA_VISIBLE_DEVICES=0 nohup python ged_classification/train.py \
+CUDA_VISIBLE_DEVICES=0 python sged/train.py \
           --model_name_or_path bert-base-chinese \
-          --train_batch_size 128 \
-          --valid_batch_size 64 \
+          --train_file data/sighan/train_avg.json \
+          --valid_file data/sighan/dev_avg.json \
+          --train_batch_size 64 \
+          --valid_batch_size 32 \
           --epoch 100 \
           --lr 3e-5 \
           --patience 3 \
-          --output_dir ged_classification/checkpoints/bert \
-          > log/sged_bert.log 2>&1 &
+          --step 500 \
+          --output_dir sged/checkpoints/bert
