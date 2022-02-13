@@ -2,7 +2,9 @@ import random
 import torch
 import json
 import numpy as np
-from tqdm import tqdm
+
+label2id = {"T": 0, "F": 1}
+id2label = {value: key for key, value in label2id.items()}
 
 def get_labels(src_lst, trg_lst):
     labels = []
@@ -51,9 +53,10 @@ def write_to_file(file_path, results):
     result_j = []
     for result in results:
         result_j.append({
-            "err_sent": "".join(result[0]),
-            "cor_sent": "".join(result[1]),
-            "pre_sent": "".join(result[2])
+            "err_sent": result[0],
+            "cor_sent": result[1],
+            "true_label": result[2],
+            "predict_label": result[3]
         })
     json.dump(result_j, open(file_path, "w", encoding="utf8"), indent=2, ensure_ascii=False)
 

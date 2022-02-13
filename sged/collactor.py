@@ -1,6 +1,6 @@
 import torch
 
-class DataCollactorForGED(object):
+class DataCollactorForSGED(object):
     def __init__(self, tokenizer, max_length, label2id):
         self.tokenizer = tokenizer
         self.max_length = max_length

@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset
 from utils import load_data, get_labels
 
-class GEDDataset(Dataset):
+class SGEDDataset(Dataset):
     def __init__(self, file_path, mode):
         src_lst, trg_lst = load_data(file_path, mode)
         self.src_lst = src_lst

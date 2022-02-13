@@ -9,13 +9,13 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, BatchSampler, RandomSampler, DistributedSampler
 
 from transformers import AutoConfig, AutoTokenizer, AutoModelForSequenceClassification
-from utils import set_seed, compute_model_size, load_data, write_to_file, epoch_time
-from data import GEDDataset
-from metric import compute_metrics
-from collactor import DataCollactorForGED
+from utils import set_seed, compute_model_size, load_data, write_to_file, epoch_time, label2id, id2label
+from data import SGEDDataset
+from metric import compute_acc
+from collactor import DataCollactorForSGED
 
 
-def train(model, data_loader, optimizer, tokenizer, device, step=500):
+def train(model, data_loader, optimizer, id2label, device, step=500):
     model.train()
 
     epoch_loss = 0
@@ -36,25 +36,23 @@ def train(model, data_loader, optimizer, tokenizer, device, step=500):
         predictions = outputs.logits.argmax(-1).tolist()
         labels = labels.tolist()
         for s, t, label, predict in zip(src_tok, trg_tok, labels, predictions):
-            predict = tokenizer.convert_ids_to_tokens([p for p_id, p in enumerate(predict) if label[p_id] != -100])
-            assert len(s) == len(t) == len(predict), f"{s}  {t}  {predict}  {len(s)}/{len(t)}/{len(predict)}"
-            results.append([s, t, predict])
+            label, predict = id2label[label], id2label[predict]
+            results.append([s, t, label, predict])
 
         if (i + 1) % step == 0:
-            metrics = compute_metrics(results)
-            print(f"Step {i + 1}, loss={epoch_loss / (i + 1):.4f}, "
-                  f"{', '.join([f'{key}={value:.4f}' for key, value in metrics.items()])}")
+            acc = compute_acc(results)
+            print(f"Step {i + 1}, loss={epoch_loss / (i + 1):.4f}, acc={acc:.4f}")
 
-    return epoch_loss / len(data_loader), compute_metrics(results)
+    return epoch_loss / len(data_loader), compute_acc(results)
 
 
-def valid(model, data_loader, tokenizer, device, step=500):
+def valid(model, data_loader, id2label, device, step=500):
     model.eval()
 
     epoch_loss = 0
     results = []
     with torch.no_grad():
-        for i, (src, labels, src_tok, trg_tok) in enumerate(data_loader):
+        for i, (src, labels, src_oral, trg_oral) in enumerate(data_loader):
             src["labels"] = labels
             src = src.to(device)
             outputs = model(**src)
@@ -64,17 +62,15 @@ def valid(model, data_loader, tokenizer, device, step=500):
 
             predictions = outputs.logits.argmax(-1).tolist()
             labels = labels.tolist()
-            for s, t, label, predict in zip(src_tok, trg_tok, labels, predictions):
-                predict = tokenizer.convert_ids_to_tokens([p for p_id, p in enumerate(predict) if label[p_id] != -100])
-                assert len(s) == len(t) == len(predict), f"{s}  {t}  {predict}  {len(s)}/{len(t)}/{len(predict)}"
-                results.append([s, t, predict])
+            for s, t, label, predict in zip(src_oral, trg_oral, labels, predictions):
+                label, predict = id2label[label], id2label[predict]
+                results.append([s, t, label, predict])
 
             if (i + 1) % step == 0:
-                metrics = compute_metrics(results)
-                print(f"Step {i + 1}, loss={epoch_loss / (i + 1):.4f}, "
-                      f"{', '.join([f'{key}={value:.4f}' for key, value in metrics.items()])}")
+                acc = compute_acc(results)
+                print(f"Step {i + 1}, loss={epoch_loss / (i + 1):.4f}, acc={acc:.4f}")
 
-    return epoch_loss / len(data_loader), compute_metrics(results), results
+    return epoch_loss / len(data_loader), compute_acc(results), results
 
 
 if __name__ == "__main__":
@@ -82,14 +78,14 @@ if __name__ == "__main__":
     parser.add_argument("--model_name_or_path", default="bert-base-chinese", type=str)
     parser.add_argument("--train_file", default="data/sighan/train.json", type=str)
     parser.add_argument("--valid_file", default="data/sighan/dev.json", type=str)
-    parser.add_argument("--save_path", default="ged_classification/checkpoints/bert", type=str)
-    parser.add_argument("--train_batch_size", default=8, type=int)
-    parser.add_argument("--valid_batch_size", default=8, type=int)
+    parser.add_argument("--save_path", default="sged/checkpoints/bert", type=str)
+    parser.add_argument("--train_batch_size", default=2, type=int)
+    parser.add_argument("--valid_batch_size", default=2, type=int)
     parser.add_argument("--max_length", default=512, type=int)
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--epochs", default=100, type=int)
     parser.add_argument("--patience", default=3, type=int)
-    parser.add_argument("--step", default=2, type=int)
+    parser.add_argument("--step", default=500, type=int)
     parser.add_argument("--lr", default=3e-5, type=float)
     parser.add_argument("--weight_decay", default=0.0, type=float)
     args = parser.parse_args()
@@ -102,20 +98,16 @@ if __name__ == "__main__":
     if not os.path.exists(args.save_path):
         os.makedirs(args.save_path)
 
-    label2id = {"T": 0, "F": 1}
-    id2label = {value: key for key, value in label2id.items()}
-    num_labels = len(label2id)
-
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-    model = AutoModelForSequenceClassification.from_pretrained(args.model_name_or_path, num_labels=num_labels)
+    model = AutoModelForSequenceClassification.from_pretrained(args.model_name_or_path, num_labels=len(label2id))
     model = model.to(device)
     compute_model_size(model)
 
-    train_dataset = GEDDataset(file_path=args.train_file, mode="train")
-    valid_dataset = GEDDataset(file_path=args.valid_file, mode="valid")
+    train_dataset = SGEDDataset(file_path=args.train_file, mode="train")
+    valid_dataset = SGEDDataset(file_path=args.valid_file, mode="valid")
 
-    collactor = DataCollactorForGED(tokenizer=tokenizer, max_length=args.max_length, label2id=label2id)
-    train_dataloader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=collactor)
+    collactor = DataCollactorForSGED(tokenizer=tokenizer, max_length=args.max_length, label2id=label2id)
+    train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=args.train_batch_size, collate_fn=collactor)
     valid_dataloader = DataLoader(valid_dataset, shuffle=False, collate_fn=collactor, batch_size=args.valid_batch_size)
 
     no_decay = ["bias", "LayerNorm.weight"]
@@ -133,29 +125,29 @@ if __name__ == "__main__":
 
     patience = 0
     print("Start valid before training...")
-    valid_loss, valid_acc, _ = valid(model, valid_dataloader, tokenizer, device, args.step)
+    valid_loss, valid_acc, _ = valid(model, valid_dataloader, id2label, device, args.step)
     store_metrics = {
         "valid_acc": valid_acc
     }
-    print(f"Before training, valid_loss={valid_loss:.4f}, valid_acc={valid_acc}")
+    print(f"Before training, valid_loss={valid_loss:.4f}, valid_acc={valid_acc:.4f}")
 
     all_start_time = time.time()
     for epoch in range(args.epochs):
         print(f"Start train {epoch + 1}th epochs")
         start_time = time.time()
-        train_loss, train_acc = train(model, train_dataloader, optimizer, tokenizer, device, args.step)
+        train_loss, train_acc = train(model, train_dataloader, optimizer, id2label, device, args.step)
         end_time = time.time()
         epoch_mins, epoch_secs = epoch_time(start_time, end_time)
         print(f"Epoch {epoch + 1}th:  time={epoch_mins}m{epoch_secs}s, "
-              f"train_loss={train_loss:.4f}, train_acc={train_acc}")
+              f"train_loss={train_loss:.4f}, train_acc={train_acc:.4f}")
 
         print(f"Start valid {epoch + 1}th epochs")
         start_time = time.time()
-        valid_loss, valid_acc, results = valid(model, valid_dataloader, tokenizer, device, args.step)
+        valid_loss, valid_acc, results = valid(model, valid_dataloader, id2label, device, args.step)
         end_time = time.time()
         epoch_mins, epoch_secs = epoch_time(start_time, end_time)
         print(f"Epoch {epoch + 1}th:  time={epoch_mins}m{epoch_secs}s, "
-              f"valid_loss={valid_loss:.4f}, valid_acc={valid_acc}")
+              f"valid_loss={valid_loss:.4f}, valid_acc={valid_acc:.4f}")
 
         if valid_acc > store_metrics["valid_acc"]:
             store_metrics["valid_acc"] = valid_acc
@@ -170,6 +162,7 @@ if __name__ == "__main__":
                 "train_acc": train_acc,
                 "train_loss": train_loss,
                 "valid_loss": valid_loss,
+                "label2id": label2id
             }, os.path.join(args.save_path, "model.tar"))
             print(f"save model to {args.save_path}")
 
@@ -184,7 +177,7 @@ if __name__ == "__main__":
             epoch_mins, epoch_secs = epoch_time(all_start_time, all_end_time)
             print("Training Over!")
             print(f"All time={epoch_mins}m{epoch_secs}s")
-            print(f"Best train_acc={store_metrics['train_acc']}, valid_acc={store_metrics['valid_acc']}")
+            print(f"Best train_acc={store_metrics['train_acc']:.4f}, valid_acc={store_metrics['valid_acc']:.4f}")
             break
 
     if patience < args.patience:
@@ -192,7 +185,7 @@ if __name__ == "__main__":
         epoch_mins, epoch_secs = epoch_time(all_start_time, all_end_time)
         print("Training Over!")
         print(f"All time={epoch_mins}m{epoch_secs}s")
-        print(f"Best train_acc={store_metrics['train_acc']}, valid_acc={store_metrics['valid_acc']}")
+        print(f"Best train_acc={store_metrics['train_acc']:.4f}, valid_acc={store_metrics['valid_acc']:.4f}")
 
 
 
