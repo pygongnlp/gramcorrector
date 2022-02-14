@@ -1,0 +1,11 @@
+CUDA_VISIBLE_DEVICES=0 python sec/train.py \
+          --model_name_or_path bert-base-chinese \
+          --train_file data/sighan/train.json \
+          --valid_file data/sighan/dev.json \
+          --train_batch_size 64 \
+          --valid_batch_size 32 \
+          --epoch 100 \
+          --lr 3e-5 \
+          --patience 3 \
+          --step 500 \
+          --output_dir sec/checkpoints/bert
