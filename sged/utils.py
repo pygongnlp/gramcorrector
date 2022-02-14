@@ -54,9 +54,8 @@ def write_to_file(file_path, results):
     for result in results:
         result_j.append({
             "err_sent": result[0],
-            "cor_sent": result[1],
-            "true_label": result[2],
-            "predict_label": result[3]
+            "true_label": result[1],
+            "predict_label": result[2]
         })
     json.dump(result_j, open(file_path, "w", encoding="utf8"), indent=2, ensure_ascii=False)
 

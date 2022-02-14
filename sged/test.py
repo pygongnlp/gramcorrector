@@ -38,7 +38,7 @@ if __name__ == "__main__":
             predict = id2label[outputs[0].argmax(-1).item()]
             label = "T" if s == t else "F"
 
-            results.append([s, t, label, predict])
+            results.append([s, label, predict])
 
     acc = compute_acc(results)
     print(f"acc={acc:.4f}")

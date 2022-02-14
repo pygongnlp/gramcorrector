@@ -1,6 +1,6 @@
 def compute_acc(results):
-    labels = [pair[2] for pair in results]
-    predicts = [pair[3] for pair in results]
+    labels = [pair[1] for pair in results]
+    predicts = [pair[2] for pair in results]
     assert len(labels) == len(predicts)
 
     acc = 0

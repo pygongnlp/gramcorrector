@@ -20,7 +20,7 @@ def train(model, data_loader, optimizer, id2label, device, step=500):
 
     epoch_loss = 0
     results = []
-    for i, (src, labels, src_tok, trg_tok) in enumerate(data_loader):
+    for i, (src, labels, src_oral) in enumerate(data_loader):
         src["labels"] = labels
         src = src.to(device)
 
@@ -35,9 +35,9 @@ def train(model, data_loader, optimizer, id2label, device, step=500):
 
         predictions = outputs.logits.argmax(-1).tolist()
         labels = labels.tolist()
-        for s, t, label, predict in zip(src_tok, trg_tok, labels, predictions):
+        for s, label, predict in zip(src_oral, labels, predictions):
             label, predict = id2label[label], id2label[predict]
-            results.append([s, t, label, predict])
+            results.append([s, label, predict])
 
         if (i + 1) % step == 0:
             acc = compute_acc(results)
@@ -52,7 +52,7 @@ def valid(model, data_loader, id2label, device, step=500):
     epoch_loss = 0
     results = []
     with torch.no_grad():
-        for i, (src, labels, src_oral, trg_oral) in enumerate(data_loader):
+        for i, (src, labels, src_oral) in enumerate(data_loader):
             src["labels"] = labels
             src = src.to(device)
             outputs = model(**src)
@@ -62,9 +62,9 @@ def valid(model, data_loader, id2label, device, step=500):
 
             predictions = outputs.logits.argmax(-1).tolist()
             labels = labels.tolist()
-            for s, t, label, predict in zip(src_oral, trg_oral, labels, predictions):
+            for s, label, predict in zip(src_oral, labels, predictions):
                 label, predict = id2label[label], id2label[predict]
-                results.append([s, t, label, predict])
+                results.append([s, label, predict])
 
             if (i + 1) % step == 0:
                 acc = compute_acc(results)
@@ -108,7 +108,7 @@ if __name__ == "__main__":
 
     collactor = DataCollactorForSGED(tokenizer=tokenizer, max_length=args.max_length, label2id=label2id)
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=args.train_batch_size, collate_fn=collactor)
-    valid_dataloader = DataLoader(valid_dataset, shuffle=False, collate_fn=collactor, batch_size=args.valid_batch_size)
+    valid_dataloader = DataLoader(valid_dataset, shuffle=False, batch_size=args.valid_batch_size, collate_fn=collactor)
 
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
