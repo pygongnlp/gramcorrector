@@ -8,19 +8,19 @@ import torch.optim as optim
 import torch.nn as nn
 from torch.utils.data import DataLoader, BatchSampler, RandomSampler, DistributedSampler
 
-from transformers import AutoConfig, AutoTokenizer, AutoModelForMaskedLM
+from transformers import AutoConfig, AutoTokenizer, AutoModelForTokenClassification
 from utils import set_seed, compute_model_size, load_data, write_to_file, epoch_time
-from data import SpellGECDataset
+from data import TGEDDataset
 from metric import compute_metrics
-from collactor import DataCollactorForSpellGEC
+from collactor import DataCollactorForTGED
 
 
-def train(model, data_loader, optimizer, tokenizer, device, step=500):
+def train(model, data_loader, optimizer, id2label, device, step=500):
     model.train()
 
     epoch_loss = 0
     results = []
-    for i, (src, labels, src_tok, trg_tok) in enumerate(data_loader):
+    for i, (src, labels, src_oral, trg_oral) in enumerate(data_loader):
         src["labels"] = labels
         src = src.to(device)
 
@@ -35,8 +35,8 @@ def train(model, data_loader, optimizer, tokenizer, device, step=500):
 
         predictions = outputs.logits.argmax(-1).tolist()
         labels = labels.tolist()
-        for s, t, label, predict in zip(src_tok, trg_tok, labels, predictions):
-            predict = tokenizer.convert_ids_to_tokens([p for p_id, p in enumerate(predict) if label[p_id] != -100])
+        for s, t, label, predict in zip(src_oral, trg_oral, labels, predictions):
+            predict = [id2label[p] for p_id, p in enumerate(predict) if label[p_id] != -100]
             assert len(s) == len(t) == len(predict), f"{s}  {t}  {predict}  {len(s)}/{len(t)}/{len(predict)}"
             results.append([s, t, predict])
 
@@ -48,13 +48,13 @@ def train(model, data_loader, optimizer, tokenizer, device, step=500):
     return epoch_loss / len(data_loader), compute_metrics(results)
 
 
-def valid(model, data_loader, tokenizer, device, step=500):
+def valid(model, data_loader, id2label, device, step=500):
     model.eval()
 
     epoch_loss = 0
     results = []
     with torch.no_grad():
-        for i, (src, labels, src_tok, trg_tok) in enumerate(data_loader):
+        for i, (src, labels, src_oral, trg_oral) in enumerate(data_loader):
             src["labels"] = labels
             src = src.to(device)
             outputs = model(**src)
@@ -64,8 +64,8 @@ def valid(model, data_loader, tokenizer, device, step=500):
 
             predictions = outputs.logits.argmax(-1).tolist()
             labels = labels.tolist()
-            for s, t, label, predict in zip(src_tok, trg_tok, labels, predictions):
-                predict = tokenizer.convert_ids_to_tokens([p for p_id, p in enumerate(predict) if label[p_id] != -100])
+            for s, t, label, predict in zip(src_oral, trg_oral, labels, predictions):
+                predict = [id2label[p] for p_id, p in enumerate(predict) if label[p_id] != -100]
                 assert len(s) == len(t) == len(predict), f"{s}  {t}  {predict}  {len(s)}/{len(t)}/{len(predict)}"
                 results.append([s, t, predict])
 
@@ -78,11 +78,11 @@ def valid(model, data_loader, tokenizer, device, step=500):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser("Spell Error Correction")
-    parser.add_argument("--model_name_or_path", default="model/chinese_bert", type=str)
+    parser = argparse.ArgumentParser("Token-Level Grammatical Error Detection")
+    parser.add_argument("--model_name_or_path", default="bert-base-chinese", type=str)
     parser.add_argument("--train_file", default="data/sighan/train.json", type=str)
     parser.add_argument("--valid_file", default="data/sighan/dev.json", type=str)
-    parser.add_argument("--save_path", default="spell_gec/checkpoints/bert", type=str)
+    parser.add_argument("--save_path", default="tged/checkpoints/bert", type=str)
     parser.add_argument("--train_batch_size", default=8, type=int)
     parser.add_argument("--valid_batch_size", default=8, type=int)
     parser.add_argument("--max_length", default=512, type=int)
@@ -102,15 +102,19 @@ if __name__ == "__main__":
     if not os.path.exists(args.save_path):
         os.makedirs(args.save_path)
 
+    label2id = {"T": 0, "F": 1}
+    id2label = {value: key for key, value in label2id.items()}
+    num_labels = len(label2id)
+
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-    model = AutoModelForMaskedLM.from_pretrained(args.model_name_or_path)
+    model = AutoModelForTokenClassification.from_pretrained(args.model_name_or_path, num_labels=num_labels)
     model = model.to(device)
     compute_model_size(model)
 
-    train_dataset = SpellGECDataset(file_path=args.train_file, mode="train")
-    valid_dataset = SpellGECDataset(file_path=args.valid_file, mode="valid")
+    train_dataset = TGEDDataset(file_path=args.train_file, mode="train")
+    valid_dataset = TGEDDataset(file_path=args.valid_file, mode="valid")
 
-    collactor = DataCollactorForSpellGEC(tokenizer=tokenizer, max_length=args.max_length)
+    collactor = DataCollactorForTGED(tokenizer=tokenizer, max_length=args.max_length, label2id=label2id)
     train_dataloader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=collactor)
     valid_dataloader = DataLoader(valid_dataset, shuffle=False, collate_fn=collactor, batch_size=args.valid_batch_size)
 
@@ -129,7 +133,7 @@ if __name__ == "__main__":
 
     patience = 0
     print("Start valid before training...")
-    valid_loss, valid_metrics, _ = valid(model, valid_dataloader, tokenizer, device, args.step)
+    valid_loss, valid_metrics, _ = valid(model, valid_dataloader, id2label, device, args.step)
     store_metrics = {
         "valid_metrics": valid_metrics
     }
@@ -139,7 +143,7 @@ if __name__ == "__main__":
     for epoch in range(args.epochs):
         print(f"Start train {epoch + 1}th epochs")
         start_time = time.time()
-        train_loss, train_metrics = train(model, train_dataloader, optimizer, tokenizer, device, args.step)
+        train_loss, train_metrics = train(model, train_dataloader, optimizer, id2label, device, args.step)
         end_time = time.time()
         epoch_mins, epoch_secs = epoch_time(start_time, end_time)
         print(f"Epoch {epoch + 1}th:  time={epoch_mins}m{epoch_secs}s, "

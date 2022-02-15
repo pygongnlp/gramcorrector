@@ -4,6 +4,26 @@ import json
 import numpy as np
 from tqdm import tqdm
 
+def get_labels(src_lst, trg_lst):
+    labels = []
+    for src, trg in zip(src_lst, trg_lst):
+        label = []
+        for s, t in zip(src, trg):
+            if s == t:
+                label.append("T")
+            else:
+                label.append("F")
+        assert len(src) == len(trg) == len(label)
+        labels.append(label)
+    return labels
+
+def is_all_zh(s):
+    for c in s:
+        print(c)
+        if not ('\u4e00' <= c <= '\u9fa5'):
+            return False
+    return True
+
 def load_data(file_path, mode="train"):
     same_cnt = 0
     src_lst, trg_lst = [], []
@@ -11,8 +31,11 @@ def load_data(file_path, mode="train"):
     with open(file_path, "r", encoding="utf8") as fr:
         pairs = json.load(fr)
         for pair in pairs:
-            err_sent = pair["original_text"]
-            cor_sent = pair["correct_text"]
+            err_sent = list(pair["original_text"])
+            cor_sent = list(pair["correct_text"])
+
+            # if not is_all_zh(err_sent) or not is_all_zh(cor_sent):
+            #     continue
 
             assert len(err_sent) == len(cor_sent)  #check if trg length == src length
             if err_sent == cor_sent:
@@ -42,9 +65,9 @@ def write_to_file(file_path, results):
     result_j = []
     for result in results:
         result_j.append({
-            "err_sent": "".join(result[0]),
-            "cor_sent": "".join(result[1]),
-            "pre_sent": "".join(result[2])
+            "err_sent": " ".join(result[0]),
+            "cor_sent": " ".join(result[1]),
+            "pre_sent": " ".join(result[2])
         })
     json.dump(result_j, open(file_path, "w", encoding="utf8"), indent=2, ensure_ascii=False)
 
