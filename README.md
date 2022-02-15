@@ -1,34 +1,37 @@
 # gramcorrector
-A simple tutoral for error correction task, based on Pytorch
 
-### Corpus
-#### SIGHAN
-using SIGHAN13, 14, 15 & Augumented 28W sentences  
-
-preprocess following <https://github.com/gitabtion/BertBasedCorrectionModels/>     
-
-|  Train  |  Valid  |  Test  |  
-|  ----  | ----  |  ----  |
-| 251841/2921  | 27982/293 | 1100/558  |  
-
-
-**Grammatical Error Detection (sentence-level)**
-
-a binary sequence-based classification task, use to predict if one sentence is grammatical.
-
-**Grammatical Error Detection (token-level)**  
-a binary token-based classification task, a coarse version of error detection, not only
-predict if one sentence is grammatical, also output which token is wrong in an error sentence.
-
-**Spell Error Correction (Chinese)**  
-use to correct spell error in chinese
-
-**Grammatical Error Correction**  
-use to correct all type of errors
-
-
-### Connect  
-Peiyuan Gong(BIT)  pygongnlp@gmail.com
+#### Introduction
 
 
 
+#### Tasks
+
+* **SGED (Sentence-Level Grammatical Error Detection)**
+* **TGED (Token-Level Grammatical Error Detection)**
+* **SEC (Spell Error Correction)**
+* **GEC (Grammatical Error Correction)**
+
+#### Corpus
+
+#### Models
+
+#### Experiments
+
+* **SGED**
+* **TGED**
+* **SEC**
+* **GEC**
+
+#### Results
+
+* **SGED**
+* **TGED**
+* **SEC**
+* **GEC**
+
+#### References
+
+#### Connection
+Peiyuan Gong (公培元）, from Beijing Institute of Technology （北京理工大学）
+Email:  pygongnlp@gmail.com
+Wechat:  gongpeiyuan1
