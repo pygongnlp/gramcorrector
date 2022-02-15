@@ -1,7 +1,7 @@
 # gramcorrector
 
 #### Introduction
-
+A simple recipe for building a grammatical error correction (GEC) system .
 
 
 #### Tasks
@@ -32,6 +32,6 @@
 #### References
 
 #### Connection
-Peiyuan Gong (公培元）, from Beijing Institute of Technology （北京理工大学）
-Email:  pygongnlp@gmail.com
+Peiyuan Gong (公培元）, from Beijing Institute of Technology （北京理工大学）  
+Email:  pygongnlp@gmail.com  
 Wechat:  gongpeiyuan1
